@@ -16,7 +16,7 @@ const openai = new OpenAI({
 // ------------ Load reference file once ------------
 let extraContent = '';
 try {
-  const filePath = path.join(__dirname, '../public/GravityMedTech.rtf');
+  const filePath = path.join(__dirname, '../Public/GravityMedTech.rtf');
   extraContent = fs.readFileSync(filePath, 'utf8');
   console.log('✅ Loaded GravityMedTech.rtf for prompt context');
 } catch (err) {
