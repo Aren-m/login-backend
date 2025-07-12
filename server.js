@@ -6,6 +6,7 @@ const cors = require('cors');
 const authRoutes = require('./routes/auth');
 const invoiceRoutes = require('./routes/invoices');
 const poRoutes = require('./routes/purchaseOrders');
+const chatRoutes = require('./routes/chat');
 
 const app = express();
 
@@ -16,6 +17,8 @@ app.use(express.json());
 app.use('/api/auth', authRoutes);
 app.use('/api/invoices', invoiceRoutes);
 app.use('/api/pos', poRoutes);
+app.use('/chat', chatRoutes);
+
 
 // MongoDB connection
 console.log("Connecting to MongoDB...");
