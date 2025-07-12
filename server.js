@@ -10,6 +10,12 @@ const chatRoutes = require('./routes/chat');
 
 const app = express();
 
+const path = require('path');
+
+// Serve the "guru ai" folder at /guru-ai
+app.use('/guru-ai', express.static(path.join(__dirname, 'guru ai')));
+
+
 // Middleware
 app.use(cors());
 app.use(express.json());
