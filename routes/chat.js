@@ -45,7 +45,7 @@ router.post('/', async (req, res) => {
 
   try {
     const completion = await openai.chat.completions.create({
-      model: 'gpt-4.1',
+      model: 'o3',
       messages: chatHistory,
       temperature: 0.7,
       max_tokens: 400,
