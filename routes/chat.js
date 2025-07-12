@@ -1,20 +1,17 @@
 // routes/chat.js
 const router = require('express').Router();
-const { Configuration, OpenAIApi } = require('openai');
+const OpenAI = require('openai');
 
-require('dotenv').config();
-
-const configuration = new Configuration({
+const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
-const openai = new OpenAIApi(configuration);
 
 const SYSTEM_PROMPT = process.env.SYSTEM_PROMPT || "You are a helpful assistant.";
 
 router.post('/', async (req, res) => {
   const { message = '', history = [] } = req.body;
 
-  // Rebuild message history for OpenAI
+  // Build chat history for OpenAI
   const chat_history = [
     { role: 'system', content: SYSTEM_PROMPT },
     ...history.flatMap(([user, bot]) => [
@@ -25,13 +22,13 @@ router.post('/', async (req, res) => {
   ];
 
   try {
-    const completion = await openai.createChatCompletion({
+    const completion = await openai.chat.completions.create({
       model: "gpt-4.1",
       messages: chat_history,
       temperature: 0.7,
-      max_tokens: 1000,
+      max_tokens: 400,
     });
-    const reply = completion.data.choices[0].message.content.trim();
+    const reply = completion.choices[0].message.content.trim();
     res.json({ reply });
   } catch (err) {
     console.error(err);
@@ -40,3 +37,4 @@ router.post('/', async (req, res) => {
 });
 
 module.exports = router;
+
