@@ -3,6 +3,8 @@ const express = require('express');
 const path = require('path');
 const fs = require('fs');
 const OpenAI = require('openai');
+const Conversation = require('../models/Conversation');
+
 
 require('dotenv').config();
 
@@ -52,6 +54,20 @@ router.post('/', async (req, res) => {
     });
 
     const reply = completion.choices[0].message.content.trim();
+
+    // ---- Save the conversation here! ----
+    try {
+      await Conversation.create({
+        sessionId: req.body.sessionId || 'anonymous',
+        timestamp: new Date(),
+        history: [...history, [message, reply]],
+      });
+      console.log('✅ Conversation saved');
+    } catch (err) {
+      console.error('❌ Failed to save conversation:', err.message);
+    }
+
+    // ---- Send reply to frontend ----
     res.json({ reply });
   } catch (err) {
     console.error('OpenAI error:', err.message);
@@ -59,6 +75,5 @@ router.post('/', async (req, res) => {
   }
 });
 
-module.exports = router;
 
 
