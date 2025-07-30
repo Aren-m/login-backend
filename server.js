@@ -7,6 +7,7 @@ const authRoutes = require('./routes/auth');
 const invoiceRoutes = require('./routes/invoices');
 const poRoutes = require('./routes/purchaseOrders');
 const chatRoutes = require('./routes/chat');
+const reguRoutes = require('./routes/regu');
 
 const app = express();
 
@@ -22,6 +23,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/invoices', invoiceRoutes);
 app.use('/api/pos', poRoutes);
 app.use('/chat', chatRoutes);
+app.use('/api/regu', reguRoutes);
 
 
 // MongoDB connection
