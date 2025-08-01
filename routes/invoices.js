@@ -1,8 +1,8 @@
 const express = require('express');
 const Invoice = require('../models/Invoice');
-const authMiddleware = require('../middleware/auth');
-const PDFDocument = require('pdfkit');
 
+const PDFDocument = require('pdfkit');
+const router = express.Router();
 
 function generateInvoicePDF(invoice, res) {
   const doc = new PDFDocument({ size: 'A4', margin: 50 });
@@ -93,9 +93,20 @@ function generateInvoicePDF(invoice, res) {
   doc.end();
 }
 
-const router = express.Router();
+// temporary public route for webflow demo (no token required)
+router.get('/public-unauthed', async (req, res) => {
+  try {
+    const invoices = await Invoice.find();
+    res.json(invoices);
+  } catch (err) {
+    console.error('Error fetching public invoices', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 
 // Protect all routes with auth middleware
+const authMiddleware = require('../middleware/auth');
 router.use(authMiddleware);
 
 // Create invoice: from logged-in user to another user
@@ -198,15 +209,5 @@ router.get('/:id/pdf', async (req, res) => {
   }
 });
 
-// temporary public route for webflow demo (no token required)
-router.get('/public-unauthed', async (req, res) => {
-  try {
-    const invoices = await Invoice.find();
-    res.json(invoices);
-  } catch (err) {
-    console.error('Error fetching public invoices', err);
-    res.status(500).json({ error: 'Server error' });
-  }
-});
 
 module.exports = router;
