@@ -13,6 +13,9 @@ const reguRoutes = require('./routes/regu');
 
 const app = express();
 
+const path = require('path');
+app.use('/Public', express.static(path.join(__dirname, 'Public')));
+
 // Middleware
 app.use(cors());
 app.use(express.json());
@@ -20,6 +23,8 @@ app.use(express.json());
 app.use('/api/auth', authRoutes);
 app.use('/api/invoices', invoiceRoutes);
 app.use('/api/pos', poRoutes);
+app.use('/chat', chatRoutes);
+app.use('/api/regu', reguRoutes);
 
 
 // HTTP + WebSocket server setup
