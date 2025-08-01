@@ -1,9 +1,9 @@
 const mongoose = require('mongoose');
 
 const InvoiceSchema = new mongoose.Schema({
-  invoiceNumber: { type: String, required: true, unique: true }, // You can generate this in the backend
-  fromUser: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
-  toUser: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+  invoiceNumber: { type: String, required: false, unique: true }, // You can generate this in the backend
+  fromUser: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: false },
+  toUser: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: false },
   client: { type: String, required: true },
   poNumber: { type: String }, // Links to PO
   items: [{
