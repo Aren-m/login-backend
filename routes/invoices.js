@@ -198,4 +198,15 @@ router.get('/:id/pdf', async (req, res) => {
   }
 });
 
+// temporary public route for webflow demo (no token required)
+router.get('/public-unauthed', async (req, res) => {
+  try {
+    const invoices = await Invoice.find();
+    res.json(invoices);
+  } catch (err) {
+    console.error('Error fetching public invoices', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 module.exports = router;
