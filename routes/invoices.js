@@ -104,6 +104,17 @@ router.get('/public-unauthed', async (req, res) => {
   }
 });
 
+// ✅ TEMPORARY PUBLIC ROUTE – NO TOKEN REQUIRED
+router.post('/public-unauthed', async (req, res) => {
+  try {
+    const invoice = new Invoice(req.body);
+    await invoice.save();
+    res.json(invoice);
+  } catch (err) {
+    console.error("Error saving invoice:", err);
+    res.status(500).json({ error: "Server error" });
+  }
+});
 
 // Protect all routes with auth middleware
 const authMiddleware = require('../middleware/auth');
