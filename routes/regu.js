@@ -23,8 +23,8 @@ function extractAssistantText(messages) {
 
 /**
  * POST /regu
- * Body: { message: string }
- * Returns: { reply: string }
+ * Body: { message: string, sessionId?: string, history?: Array<[string, string]> }
+ * Returns: { reply: string, sessionId: string }
  */
 router.post('/', async (req, res) => {
   const { message = '', sessionId = '', history = [] } = req.body;
@@ -33,27 +33,31 @@ router.post('/', async (req, res) => {
   if (!ASSISTANT_ID) return res.json({ reply: 'Assistant not configured.' });
 
   try {
-    // 1) Create (or reuse) a thread
+    // 1) Create (or reuse) a thread. The threadId IS your conversational context.
     let threadId = sessionId;
     if (!threadId) {
       const thread = await openai.beta.threads.create();
       threadId = thread.id;
+      console.log('🧵 Created new thread:', threadId);
+    } else {
+      // Optional: sanity log to verify reuse
+      console.log('🧵 Reusing thread:', threadId);
     }
 
-    // 2) Add the user message
+    // 2) Add the user message to the thread
     await openai.beta.threads.messages.create(threadId, {
       role: 'user',
       content: message,
     });
 
-    // 3) Run the assistant
+    // 3) Run the assistant on this thread
     const run = await openai.beta.threads.runs.create(threadId, {
       assistant_id: ASSISTANT_ID,
     });
 
-    // 4) Poll for completion
+    // 4) Poll for completion (simple polling loop)
     let replyText = '';
-    const maxTries = 30; // ~15s
+    const maxTries = 30; // ~15s at 500ms interval
     for (let i = 0; i < maxTries; i++) {
       const status = await openai.beta.threads.runs.retrieve(threadId, run.id);
 
@@ -76,19 +80,32 @@ router.post('/', async (req, res) => {
 
     if (!replyText) replyText = 'Sorry, the assistant took too long to respond.';
 
-    // 5) Save conversation (optional)
+    // 5) Save conversation (append this turn). If you prefer a single doc per session,
+    // swap to findOneAndUpdate with $push (shown below).
     try {
+      // EITHER: keep creating a new record each turn (your current behavior)
       await Conversation.create({
-        sessionId: sessionId || threadId,
+        sessionId: sessionId || threadId,      // use existing sessionId or the new threadId
         timestamp: new Date(),
         history: [...history, [message, replyText]],
       });
+      console.log('✅ Conversation saved');
+      
+      // OR: (recommended) keep one doc per session and append history
+      // await Conversation.findOneAndUpdate(
+      //   { sessionId: sessionId || threadId },
+      //   {
+      //     $push: { history: [message, replyText] },
+      //     $setOnInsert: { timestamp: new Date() }
+      //   },
+      //   { upsert: true, new: true }
+      // );
     } catch (e) {
-      console.warn('Failed to save conversation:', e.message);
+      console.warn('⚠️ Failed to save conversation:', e.message);
     }
 
-    // Compatible with chatbot.html (expects { reply })
-    return res.json({ reply: replyText });
+    // 6) Return both the reply AND the sessionId (threadId). The client must reuse this.
+    return res.json({ reply: replyText, sessionId: threadId });
   } catch (err) {
     console.error('OpenAI error:', err?.message || err);
     return res.json({ reply: 'Sorry, there was an error contacting the assistant.' });
