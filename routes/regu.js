@@ -9,18 +9,21 @@ const router = express.Router();
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 const ASSISTANT_ID = process.env.OPENAI_ASSISTANT_ID;
 
-// grab first assistant text block
+// Helper: pull first assistant text from messages.list
 function extractAssistantText(messages) {
   for (const msg of messages) {
     if (msg.role === 'assistant' && Array.isArray(msg.content)) {
       for (const part of msg.content) {
-        if (part.type === 'text' && part.text?.value) return part.text.value;
+        if (part.type === 'text' && part.text?.value) {
+          return part.text.value;
+        }
       }
     }
   }
   return null;
 }
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 /**
  * POST /regu
@@ -30,27 +33,31 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 router.post('/', async (req, res) => {
   const { message = '', history = [] } = req.body || {};
 
-  if (!message) return res.json({ reply: 'No message provided.' });
-  if (!ASSISTANT_ID) return res.json({ reply: 'Assistant not configured.' });
+  if (!message) {
+    return res.json({ reply: 'No message provided.' });
+  }
+  if (!ASSISTANT_ID) {
+    return res.json({ reply: 'Assistant not configured.' });
+  }
 
   try {
-    // 1) always start a fresh thread (no reuse)
+    // 1) Always start a fresh thread (no reuse)
     const thread = await openai.beta.threads.create();
     const threadId = thread.id;
     console.log('🧵 Created new thread:', threadId);
 
-    // 2) add the user message
+    // 2) Add the user message
     await openai.beta.threads.messages.create(threadId, {
       role: 'user',
       content: message,
     });
 
-    // 3) run the assistant
+    // 3) Run the assistant
     const run = await openai.beta.threads.runs.create(threadId, {
       assistant_id: ASSISTANT_ID,
     });
 
-    // 4) poll for completion
+    // 4) Poll for completion
     let replyText = '';
     const maxTries = 60; // ~30s at 500ms
     for (let i = 0; i < maxTries; i++) {
@@ -73,9 +80,11 @@ router.post('/', async (req, res) => {
       await sleep(500);
     }
 
-    if (!replyText) replyText = 'Sorry, the assistant took too long to respond.';
+    if (!replyText) {
+      replyText = 'Sorry, the assistant took too long to respond.';
+    }
 
-    // 5) save transcript (for logs/analytics only; never read back)
+    // 5) Save transcript (for logs only; never reused)
     try {
       await Conversation.create({
         sessionId: threadId, // stored for reference only
@@ -87,11 +96,13 @@ router.post('/', async (req, res) => {
       console.warn('⚠️ Failed to save conversation:', e.message);
     }
 
-    // 6) return reply only (no sessionId to avoid accidental reuse)
+    // 6) Return reply only (no sessionId)
     return res.json({ reply: replyText });
   } catch (err) {
     console.error('OpenAI error:', err?.message || err);
-    return res.json({ reply: 'Sorry, there was an error contacting the assistant.' });
+    return res.json({
+      reply: 'Sorry, there was an error contacting the assistant.',
+    });
   }
 });
 
