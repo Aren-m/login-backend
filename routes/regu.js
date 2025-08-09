@@ -9,7 +9,7 @@ const router = express.Router();
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 const ASSISTANT_ID = process.env.OPENAI_ASSISTANT_ID;
 
-// Helper: pull first assistant text from messages.list
+// grab first assistant text block
 function extractAssistantText(messages) {
   for (const msg of messages) {
     if (msg.role === 'assistant' && Array.isArray(msg.content)) {
@@ -20,44 +20,39 @@ function extractAssistantText(messages) {
   }
   return null;
 }
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 /**
  * POST /regu
- * Body: { message: string, sessionId?: string, history?: Array<[string, string]> }
- * Returns: { reply: string, sessionId: string }
+ * Body: { message: string, history?: Array<[string, string]> }
+ * Returns: { reply: string }
  */
 router.post('/', async (req, res) => {
-  const { message = '', sessionId = '', history = [] } = req.body;
+  const { message = '', history = [] } = req.body || {};
 
   if (!message) return res.json({ reply: 'No message provided.' });
   if (!ASSISTANT_ID) return res.json({ reply: 'Assistant not configured.' });
 
   try {
-    // 1) Create (or reuse) a thread. The threadId IS your conversational context.
-    let threadId = sessionId;
-    if (!threadId) {
-      const thread = await openai.beta.threads.create();
-      threadId = thread.id;
-      console.log('🧵 Created new thread:', threadId);
-    } else {
-      // Optional: sanity log to verify reuse
-      console.log('🧵 Reusing thread:', threadId);
-    }
+    // 1) always start a fresh thread (no reuse)
+    const thread = await openai.beta.threads.create();
+    const threadId = thread.id;
+    console.log('🧵 Created new thread:', threadId);
 
-    // 2) Add the user message to the thread
+    // 2) add the user message
     await openai.beta.threads.messages.create(threadId, {
       role: 'user',
       content: message,
     });
 
-    // 3) Run the assistant on this thread
+    // 3) run the assistant
     const run = await openai.beta.threads.runs.create(threadId, {
       assistant_id: ASSISTANT_ID,
     });
 
-    // 4) Poll for completion (simple polling loop)
+    // 4) poll for completion
     let replyText = '';
-    const maxTries = 30; // ~15s at 500ms interval
+    const maxTries = 60; // ~30s at 500ms
     for (let i = 0; i < maxTries; i++) {
       const status = await openai.beta.threads.runs.retrieve(threadId, run.id);
 
@@ -75,37 +70,25 @@ router.post('/', async (req, res) => {
         break;
       }
 
-      await new Promise((r) => setTimeout(r, 500));
+      await sleep(500);
     }
 
     if (!replyText) replyText = 'Sorry, the assistant took too long to respond.';
 
-    // 5) Save conversation (append this turn). If you prefer a single doc per session,
-    // swap to findOneAndUpdate with $push (shown below).
+    // 5) save transcript (for logs/analytics only; never read back)
     try {
-      // EITHER: keep creating a new record each turn (your current behavior)
       await Conversation.create({
-        sessionId: sessionId || threadId,      // use existing sessionId or the new threadId
+        sessionId: threadId, // stored for reference only
         timestamp: new Date(),
         history: [...history, [message, replyText]],
       });
       console.log('✅ Conversation saved');
-      
-      // OR: (recommended) keep one doc per session and append history
-      // await Conversation.findOneAndUpdate(
-      //   { sessionId: sessionId || threadId },
-      //   {
-      //     $push: { history: [message, replyText] },
-      //     $setOnInsert: { timestamp: new Date() }
-      //   },
-      //   { upsert: true, new: true }
-      // );
     } catch (e) {
       console.warn('⚠️ Failed to save conversation:', e.message);
     }
 
-    // 6) Return both the reply AND the sessionId (threadId). The client must reuse this.
-    return res.json({ reply: replyText, sessionId: threadId });
+    // 6) return reply only (no sessionId to avoid accidental reuse)
+    return res.json({ reply: replyText });
   } catch (err) {
     console.error('OpenAI error:', err?.message || err);
     return res.json({ reply: 'Sorry, there was an error contacting the assistant.' });
